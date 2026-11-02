@@ -1,0 +1,18 @@
+# Fixed votes per coded bit: a longer code marks more blocks, so its strength must
+# fall to stay at 40 dB. Hard attack set, the same attacks as configs/imwm.yaml.
+run_dir: results/imwm_fixed
+n_test: 10
+n_calib: 100
+target_wpsnr: 40.0
+votes_per_bit: 8      # the longest codes (n = 2048) x 8 = all 16384 blocks
+attacks:
+  Geometric: rot_1
+  Compression: webp_30
+  Filtering: gblur_2.5
+  Noise: sp_5
+  Color: gamma_1.5
+  Combined: blur1.5+jpeg50
+codes: null
+code_modules: null
+seed: 2026
+workers: 6

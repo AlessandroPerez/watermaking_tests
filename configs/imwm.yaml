@@ -1,0 +1,11 @@
+# invisible-watermark (dwtDctSvd) + ECC suite, blind extraction, strength calibrated to wPSNR 40 dB
+run_dir: results/imwm_svd
+n_test: 10            # test images (DIV2K valid, every 10th from 0801)
+n_calib: 100          # strength averaged over all of DIV2K-val
+target_wpsnr: 40.0
+select_target_ber: 0.15
+attacks: null         # null = pilot-based selection, or {category: attack_name}
+codes: null           # null = every registered code
+code_modules: null
+seed: 2026
+workers: 6

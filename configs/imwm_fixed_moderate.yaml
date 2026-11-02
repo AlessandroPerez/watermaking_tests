@@ -1,0 +1,17 @@
+# Same as imwm_fixed.yaml with the moderate attacks of configs/imwm_moderate.yaml.
+run_dir: results/imwm_fixed_moderate
+n_test: 10
+n_calib: 100
+target_wpsnr: 40.0
+votes_per_bit: 8
+attacks:
+  Geometric: scale_0.5
+  Compression: webp_60
+  Filtering: gblur_2.5
+  Noise: sp_3
+  Color: contrast_+10
+  Combined: blur1.5+jpeg50
+codes: null
+code_modules: null
+seed: 2026
+workers: 6

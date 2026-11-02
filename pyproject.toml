@@ -1,0 +1,22 @@
+[project]
+name = "wmecc"
+version = "0.1.0"
+description = "Error-correcting codes for blind image watermarking (invisible-watermark) under attacks, compared at equal wPSNR"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy", "scipy", "pandas", "pyyaml", "matplotlib",
+    "opencv-python-headless", "pillow", "scikit-image", "scikit-learn", "PyWavelets",
+    "galois", "komm", "torch", "h5py", "importlib-resources",
+    # installed with --no-deps (their optional sionna-rt / opencv-python / onnx
+    # requirements are not needed here): "sionna", "invisible-watermark"
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["wmecc*"]
