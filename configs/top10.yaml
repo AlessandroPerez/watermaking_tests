@@ -1,0 +1,43 @@
+# Extended test of the ten best configurations of the fixed-votes run, ranked by
+# moderate + hard recoveries (the same ten with either message), plus the uncoded
+# baseline. Same message, seed and strengths as results/imwm_fixed: copy its
+# calibration.json to results/top10 first.
+#
+# Images: all 100. Ten of them chose these codes and ten chose the attacks, so the
+# analysis also reports the other 80 alone. Attacks: the whole suite except lossless
+# PNG and the settings at or above 45 % raw BER in the pilot, which no code can read
+# (rotation of 5 degrees or more, cropping, translation, rotation + crop, saturation -40).
+#
+# The sweep repeats the watermarked frames on 20 of the other 80 images, at strengths
+# within the standard error of the calibrated means.
+run_dir: results/top10
+all_images: true
+n_test: 100
+target_wpsnr: 40.0
+votes_per_bit: 8
+seed: 2026
+workers: 6
+strength_factors: [0.992, 0.996, 1.004, 1.008]
+sweep_images: 20
+codes: [uncoded, polar_r12, rs72_conv, turbo_r13, turbo_r12, ldpc_r12, ldpc_r13, rs72_turbo, polar_r34, rs80_conv, rs80_conv_er]
+conditions: [
+  none,
+  rot_1,   # Rotation
+  scale_0.5, scale_0.8, scale_1.2, scale_1.5, scale_2.0,   # Scaling
+  jpeg_95, jpeg_90, jpeg_85, jpeg_80, jpeg_75, jpeg_70, jpeg_65, jpeg_60, jpeg_55, jpeg_50,   # JPEG
+  webp_90, webp_75, webp_60, webp_45, webp_30,   # WebP
+  gblur_0.5, gblur_1.0, gblur_1.5, gblur_2.0, gblur_2.5,   # Gaussian blur
+  median_3, median_5, median_7,   # Median
+  bilateral_5_25, bilateral_9_50, bilateral_9_75,   # Bilateral
+  sharpen_0.5, sharpen_1.0, sharpen_2.0,   # Sharpening
+  gnoise_0.01, gnoise_0.02, gnoise_0.03, gnoise_0.04, gnoise_0.05,   # Gaussian noise
+  sp_1, sp_2, sp_3, sp_4, sp_5,   # Salt & pepper
+  unoise_0.02, unoise_0.05, unoise_0.08,   # Uniform noise
+  poisson,   # Poisson
+  bright_+10, bright_-10, bright_+20, bright_-20, bright_+30, bright_-30,   # Brightness
+  contrast_+10, contrast_-10, contrast_+20, contrast_-20, contrast_+30, contrast_-30,   # Contrast
+  sat_+20, sat_-20, sat_+40,   # Saturation
+  gamma_0.5, gamma_0.8, gamma_1.2, gamma_1.5, gamma_2.0,   # Gamma
+  blur0.5+jpeg90, blur1.0+jpeg80, blur1.0+jpeg60, blur1.5+jpeg50,   # JPEG + blur
+  noise0.01+jpeg90, noise0.02+jpeg75, noise0.03+jpeg60, noise0.05+jpeg50,   # Noise + compression
+]

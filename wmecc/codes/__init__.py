@@ -6,7 +6,7 @@ import importlib
 
 from .base import Code, DecodeResult, HardInput, simulate_awgn  # noqa: F401
 
-MODULES = ("simple", "bch", "rs", "conv", "ldpc", "polar", "turbo")
+MODULES = ("simple", "bch", "rs", "conv", "ldpc", "polar", "turbo", "concat")
 
 
 def all_codes(k: int = 512, modules: tuple[str, ...] = MODULES) -> list[Code]:

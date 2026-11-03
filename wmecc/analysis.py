@@ -21,7 +21,7 @@ import pandas as pd
 from .watermark import imwm
 
 FAMILY_ORDER = ["Uncoded", "Repetition", "Hamming", "BCH", "RS",
-                "Convolutional", "LDPC", "Polar", "Turbo"]
+                "Convolutional", "LDPC", "Polar", "Turbo", "Concatenated"]
 SEQ = ["#f0efec", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
 INK, INK2, MUTED, GRID, BASE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 
@@ -173,7 +173,7 @@ def examples(run: Path, cfg, emb: pd.DataFrame, out: Path, size: int = 320, gain
     path = cfg.test_images()[0]
     img = load_rgb(path)
     cal = json.loads((run / "calibration.json").read_text())
-    bits = np.random.default_rng(0).integers(0, 2, 512, dtype=np.uint8)
+    bits = cfg.message[0]
     wm = imwm.embed(img, bits, cal["uncoded"]["scale"], cfg.seed, cfg.votes_per_bit)
     g = img.astype(np.float32).mean(2)
     best, pos = -1.0, (0, 0)
