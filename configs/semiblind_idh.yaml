@@ -1,0 +1,43 @@
+# ID | header joint LDPC against the main semi-blind run (configs/semiblind.yaml).
+# ldpc_r12_jidh encodes ID | header as one 512-bit message with 5G LDPC r1/2 (n = 1024):
+# the same code as ldpc_r12_joint, but 5G LDPC never sends its first 128 information
+# bits, so with the ID first the header bits are sent as they are (codeword positions
+# 256-383). They are a 128-bit pilot counted before decoding (flag with a binomial
+# false-positive rate), and *_known decoders then fix them to the header and decode
+# only the ID. Same images, attacks, seeds and strength as the main run (n = 1024 shares
+# the strength of ldpc_r12_split), so its frames pair with the main run's.
+#
+#   python -m wmecc.semiblind run --config configs/semiblind_idh.yaml
+#   python -m wmecc.semiblind compare --config configs/semiblind_idh.yaml
+run_dir: results/semiblind_idh
+codes: [ldpc_r12_jidh]
+semi_blind: true
+code_modules: [split]
+all_images: true
+n_test: 100
+target_wpsnr: 40.0
+votes_per_bit: 8
+seed: 2026
+workers: 6
+search_null_every: 10   # the search also runs on the unwatermarked frames of 10 images
+conditions: [
+  none,
+  rot_1,   # Rotation
+  scale_0.5, scale_0.8, scale_1.2, scale_1.5, scale_2.0,   # Scaling
+  jpeg_95, jpeg_90, jpeg_85, jpeg_80, jpeg_75, jpeg_70, jpeg_65, jpeg_60, jpeg_55, jpeg_50,   # JPEG
+  webp_90, webp_75, webp_60, webp_45, webp_30,   # WebP
+  gblur_0.5, gblur_1.0, gblur_1.5, gblur_2.0, gblur_2.5,   # Gaussian blur
+  median_3, median_5, median_7,   # Median
+  bilateral_5_25, bilateral_9_50, bilateral_9_75,   # Bilateral
+  sharpen_0.5, sharpen_1.0, sharpen_2.0,   # Sharpening
+  gnoise_0.01, gnoise_0.02, gnoise_0.03, gnoise_0.04, gnoise_0.05,   # Gaussian noise
+  sp_1, sp_2, sp_3, sp_4, sp_5,   # Salt & pepper
+  unoise_0.02, unoise_0.05, unoise_0.08,   # Uniform noise
+  poisson,   # Poisson
+  bright_+10, bright_-10, bright_+20, bright_-20, bright_+30, bright_-30,   # Brightness
+  contrast_+10, contrast_-10, contrast_+20, contrast_-20, contrast_+30, contrast_-30,   # Contrast
+  sat_+20, sat_-20, sat_+40,   # Saturation
+  gamma_0.5, gamma_0.8, gamma_1.2, gamma_1.5, gamma_2.0,   # Gamma
+  blur0.5+jpeg90, blur1.0+jpeg80, blur1.0+jpeg60, blur1.5+jpeg50,   # JPEG + blur
+  noise0.01+jpeg90, noise0.02+jpeg75, noise0.03+jpeg60, noise0.05+jpeg50,   # Noise + compression
+]

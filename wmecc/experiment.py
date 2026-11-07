@@ -44,6 +44,7 @@ import functools
 import json
 import shutil
 import time
+import zlib
 from dataclasses import asdict, dataclass, replace
 from multiprocessing import Pool
 from pathlib import Path
@@ -83,6 +84,10 @@ class ExpConfig:
     strength_factor: float = 1.0     # multiplies every calibrated strength
     strength_factors: list | None = None   # sweep stage: repeat the run at these factors
     sweep_images: int = 20
+    semi_blind: bool = False         # message = fixed 128-bit header + 384-bit ID drawn per image
+    search_gains: list | None = None    # semi-blind search: chroma gains tried (None = default grid)
+    search_gammas: list | None = None   # semi-blind search: gammas tried (None = default grid)
+    search_null_every: int = 10      # semi-blind search: also on the unwatermarked frames of every m-th image
 
     @classmethod
     def load(cls, path: str | None) -> "ExpConfig":
@@ -110,6 +115,16 @@ class ExpConfig:
         """The one message of the experiment, shape (1, 512). Only embedding and
         scoring use it: the extractor and the decoders never see it."""
         return _rng(self.seed, self.message_seed).integers(0, 2, (1, 512), dtype=np.uint8)
+
+    def message_for(self, image: str) -> np.ndarray:
+        """The message embedded in one image, shape (1, 512): the one message, or in a
+        semi-blind run its first 128 bits (the header, the same for every image)
+        followed by 384 bits drawn for this image (the ID, the same for every code)."""
+        if not self.semi_blind:
+            return self.message
+        ident = _rng(self.seed, self.message_seed, 7, zlib.crc32(Path(image).name.encode()))
+        return np.concatenate([self.message[:, :128],
+                               ident.integers(0, 2, (1, 384), dtype=np.uint8)], axis=1)
 
 
 def _rng(*parts) -> np.random.Generator:
@@ -158,7 +173,7 @@ def _calibrate_one(args):
     code = _embedding_codes(cfg)[name][0]
     img = load_rgb(path)
     nvf = nvf_map(img)
-    bits = code.encode(cfg.message)[0] ^ whitening(cfg, code.n)
+    bits = code.encode(cfg.message_for(path.name))[0] ^ whitening(cfg, code.n)
     tried: dict = {}
 
     def gap(log_scale):
@@ -301,7 +316,10 @@ def _run_one(args):
     return rows, embeds
 
 
-def stage_run(cfg: ExpConfig):
+def stage_run(cfg: ExpConfig, worker=None, first=None):
+    """``worker`` runs one image (default ``_run_one``; the semi-blind run has its own).
+    ``first(i)`` true for image ``i`` starts it before the others: give the slowest
+    images to the workers first, so that none of them is left running alone at the end."""
     cal = json.loads((cfg.path / "calibration.json").read_text())
     conditions = cfg.conditions
     if not conditions:
@@ -311,9 +329,11 @@ def stage_run(cfg: ExpConfig):
     parts = cfg.path / "parts"          # one pair of files per finished image, resumable
     parts.mkdir(exist_ok=True)
     todo = [j for j in jobs if not (parts / f"{j[2].stem}.embedding.csv").exists()]
+    if first is not None:
+        todo.sort(key=lambda j: not first(j[1]))
     print(f"  {len(jobs) - len(todo)} of {len(jobs)} images already done", flush=True)
     with Pool(cfg.workers, initializer=_init_worker) as pool:
-        for k, (r, e) in enumerate(pool.imap_unordered(_run_one, todo), 1):
+        for k, (r, e) in enumerate(pool.imap_unordered(worker or _run_one, todo), 1):
             stem = Path(e[0]["image"]).stem
             pd.DataFrame(r).to_csv(parts / f"{stem}.results.csv", index=False)
             pd.DataFrame(e).to_csv(parts / f"{stem}.embedding.csv", index=False)

@@ -92,20 +92,44 @@ def embed(rgb: np.ndarray, bits: np.ndarray, scale: float, key: int = 0,
     return out
 
 
+def to_frame(rgb: np.ndarray) -> np.ndarray | None:
+    """The frame extraction reads: resized to the embedding frame (None if too small)."""
+    h, w = rgb.shape[:2]
+    if h * w < 256 * 256:   # same limit the library enforces
+        return None
+    if (h, w) != (SIZE, SIZE):
+        rgb = cv2.resize(rgb, (SIZE, SIZE), interpolation=cv2.INTER_AREA if h > SIZE else cv2.INTER_CUBIC)
+    return rgb
+
+
+def block_votes(rgb: np.ndarray, scale: float) -> np.ndarray | None:
+    """The library's 0/1 vote of every block (``None`` if the frame is too small).
+
+    Depends on the frame and the strength only, not on the code: frames read at the
+    same strength by several codes need one call (the slow part of extraction)."""
+    rgb = to_frame(rgb)
+    if rgb is None:
+        return None
+    dec = _VoteDecoder(watermarks=[], wmLen=BLOCKS, scales=_scales(scale))
+    scores = dec.decode_votes(np.ascontiguousarray(rgb[..., ::-1]))
+    return np.array([s[0] for s in scores], np.uint8)
+
+
+def tally(block: np.ndarray | None, n: int, key: int = 0,
+          votes: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+    """Block votes -> (votes for bit 1, number of votes) per coded bit."""
+    if block is None:
+        return np.zeros(n), np.zeros(n)
+    layout = _layout(n, key, votes)
+    marked = layout >= 0
+    ones = np.bincount(layout[marked], block[marked].astype(float), n)
+    return ones, np.bincount(layout[marked], minlength=n).astype(float)
+
+
 def extract(rgb: np.ndarray, n: int, scale: float, key: int = 0,
             votes: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Blind extraction -> (votes for bit 1, number of votes) per coded bit."""
-    h, w = rgb.shape[:2]
-    if h * w < 256 * 256:   # same limit the library enforces
-        return np.zeros(n), np.zeros(n)
-    if (h, w) != (SIZE, SIZE):
-        rgb = cv2.resize(rgb, (SIZE, SIZE), interpolation=cv2.INTER_AREA if h > SIZE else cv2.INTER_CUBIC)
-    dec = _VoteDecoder(watermarks=[], wmLen=BLOCKS, scales=_scales(scale))
-    scores = dec.decode_votes(np.ascontiguousarray(rgb[..., ::-1]))
-    layout = _layout(n, key, votes)
-    marked = layout >= 0
-    ones = np.bincount(layout[marked], np.array([s[0] for s in scores], float)[marked], n)
-    return ones, np.bincount(layout[marked], minlength=n).astype(float)
+    return tally(block_votes(rgb, scale), n, key, votes)
 
 
 def _mixture(ones: np.ndarray, count: np.ndarray):
