@@ -238,3 +238,105 @@ Full write-up: [results document](https://claude.ai/artifact/C1VdEpuetkR9WEGbDwE
   sample per block with no DCT and fails from JPEG 90 down. It also read
   resized images at their new size and let code length affect robustness. Its
   numbers should not be used.
+
+## Experiment: Meta's Seal watermarks with and without ECC
+
+**Question.** Do the deep-learning watermarks of the Seal family need an ECC to
+carry an exact message? ChunkySeal embeds 1024 bits and Pixel Seal 256. Both come
+from Meta's [videoseal](https://github.com/facebookresearch/videoseal) library,
+unmodified, with the released checkpoints, run on CPU.
+
+### Design
+
+* **Images.** The 10 test images of the experiment above (0801, 0811, …, 0891).
+  ChunkySeal resizes the image to 256×256 internally, for embedding and for
+  extraction.
+* **Strength.** ChunkySeal runs at its default strength (`scaling_w` 0.2): mean
+  wPSNR 48.87 dB, PSNR 43.97 dB. Pixel Seal's strength is raised from 0.2 to 0.2458
+  to give the same distortion: wPSNR 49.05 dB, PSNR 43.78 dB. This is about 9 dB
+  less distortion than the 40 dB of the dwtDctSvd runs, so the two experiments
+  cannot be compared number for number.
+* **Message.** A fixed 128-bit header, known to the decoder, followed by a
+  per-image ID (`configs/semiblind.yaml`). The codeword is XORed with a keyed
+  whitening sequence before embedding.
+* **Decoding.** ChunkySeal's output logits are the LLRs of a soft 5G LDPC
+  decoder (Sionna). A GMM fitted to the logits, as for dwtDctSvd, gave the same
+  results on a 180-frame check. An ID counts as recovered only if all its bits
+  are right.
+* **No ECC.** ChunkySeal always embeds 1024 bits, so the uncoded case is
+  estimated from the raw bits of the same frames: the share of disjoint 512-bit
+  (or 256-bit) blocks with no error, which is what an uncoded message of that
+  length needs. This assumes that errors do not depend on the bit values. Pixel
+  Seal is measured directly.
+
+### Results
+
+* **ChunkySeal, 512-bit message** (`results/chunkyseal_full/default`). The header
+  and a 384-bit ID are each encoded with 5G LDPC r1/2 and embedded side by side
+  (256 + 768 = 1024 bits). The 10 images are tested under no attack, the 77 attacks
+  of the extended test, and 17 more geometric attacks: rotation 5–30°, crop 90–50 %
+  and translation ±10–30 %.
+
+  | Attacks | Frames | LDPC r1/2 | No ECC (estimated) |
+  |---|---:|---:|---:|
+  | No attack | 10 | 100 % | 35 % |
+  | The 77 attacks of the extended test | 770 | 95.8 % | 19.3 % |
+  | 17 extra geometric attacks | 170 | 71.2 % | 5.6 % |
+  | All | 950 | 91.5 % (869) | 17.0 % |
+
+  * **No ECC fails even with no attack.** ChunkySeal gets 0 to 5 of its 1024 bits
+    wrong on an unattacked image (99.8 % bit accuracy), so an uncoded 512-bit
+    message would come through in only 35 % of them. Under JPEG it would come
+    through in 8 % of frames, and under WebP or salt & pepper in 1 %. LDPC recovers
+    every ID under 16 of the 20 attack categories.
+  * **Where LDPC fails.** Every other attack recovers 10/10. That includes
+    JPEG 50, blur, median, noise, all color changes, scaling 0.5–2, rotation up to
+    15° (rotation 1° defeats dwtDctSvd), crop to 50 % and translation ±10 % and
+    +20 %.
+
+    | Attack | IDs of 10 | Bit accuracy |
+    |---|---|---|
+    | WebP 60 / 45 / 30 | 9 / 5 / 1 | 92.8 / 83.3 / 72.1 % |
+    | Salt & pepper 3 / 4 / 5 % | 7 / 4 / 2 | 89.0 / 84.9 / 79.4 % |
+    | Rotation 20 / 25 / 30° | 7 / 0 / 0 | 89.6 / 64.6 / 50.3 % |
+    | Translation −20 / +30 / −30 % | 4 / 0 / 0 | 84.2 / 74.0 / 72.9 % |
+
+  * **A sharp limit.** Every frame with a raw BER up to 14.2 % decoded and every
+    frame from 14.3 % failed. The failures are spread over all 10 images (4 to 11
+    each), so they come from the attack, not the image.
+  * **Checks.** No frame gave a wrong ID. 60 of the 81 failures were still flagged
+    as watermarked by the header (at least 167 of its 256 codeword bits agree).
+    None of the 10 unwatermarked covers was flagged: the most any agreed was 133.
+
+* **ChunkySeal + ECC against Pixel Seal without ECC, 256-bit message**
+  (`results/chunky_vs_pixel`). The message is the header and the first 128 ID
+  bits. ChunkySeal carries them as one 5G LDPC r1/4 codeword (k = 256, n = 1024).
+  Pixel Seal carries the 256 bits as they are. The test uses 10 images and 10
+  strong attacks, at the matched wPSNR.
+
+  | Attack | ChunkySeal + LDPC r1/4 | ChunkySeal, no ECC (estimated) | Pixel Seal, no ECC | Raw BER, ChunkySeal / Pixel Seal |
+  |---|---:|---:|---:|---:|
+  | JPEG 50 | 100 % | 0 % | 80 % | 3.7 / 0.1 % |
+  | Blur 1.5 + JPEG 50 | 100 % | 0 % | 30 % | 4.3 / 0.4 % |
+  | Noise 0.05 + JPEG 50 | 100 % | 0 % | 0 % | 6.7 / 2.2 % |
+  | WebP 30 | 30 % | 0 % | 10 % | 30.8 / 1.4 % |
+  | Gaussian blur 2.5 | 100 % | 55 % | 70 % | 0.2 / 0.2 % |
+  | Median 7 | 100 % | 55 % | 50 % | 0.3 / 0.6 % |
+  | Gaussian noise 0.05 | 100 % | 0 % | 10 % | 2.2 / 1.3 % |
+  | Salt & pepper 5 % | 70 % | 0 % | 0 % | 22.4 / 12.8 % |
+  | Crop 50 % | 100 % | 0 % | 40 % | 2.5 / 0.9 % |
+  | Rotation 10° | 100 % | 20 % | 80 % | 0.6 / 0.2 % |
+  | All | 90 % | 13 % | 37 % | 7.4 / 2.0 % |
+
+  * **ECC wins despite noisier bits.** Pixel Seal's raw bits are cleaner, since it
+    carries a quarter as many bits at the same distortion. But one wrong bit in 256
+    loses the message, and it recovers 37 of 100. ChunkySeal + LDPC recovers 90.
+  * **Failures are visible only with ECC.** All 63 Pixel Seal failures return a
+    wrong message with nothing to show it. All 10 ChunkySeal failures fail the LDPC
+    parity check, and none returns a wrong message.
+  * **Rate.** ChunkySeal's failures, WebP 30 and salt & pepper 5 %, have mean raw
+    BERs of 22 to 31 %, at or beyond what r1/4 can correct. Going from r1/2 (the
+    512-bit test above, same images and strength) to r1/4 raises salt & pepper 5 %
+    from 2/10 to 7/10 and WebP 30 from 1/10 to 3/10.
+  * **Not tested.** Pixel Seal with an ECC. At 256 bits, r1/2 would leave room
+    for 128 message bits.
